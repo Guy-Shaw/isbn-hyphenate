@@ -44,6 +44,20 @@ That's it.
 In the process it sends out a lot of debug information:
 the prefix table, the agencies, and the rules tables.
 
+## Build
+
+```
+cd src && make
+
+## Run
+
+### Example
+
+cd cmd
+./isbn-hyphenate --argv 9781521133309
+```
+
+
 ## Plans for the future
 
 `isbn-hyphenate` is intended to be component in a larger
