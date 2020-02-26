@@ -48,11 +48,13 @@ the prefix table, the agencies, and the rules tables.
 
 ```
 cd src && make
+```
 
 ## Run
 
 ### Example
 
+```
 cd cmd
 ./isbn-hyphenate --argv 9781521133309
 ```
