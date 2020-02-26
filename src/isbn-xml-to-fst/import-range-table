@@ -1,0 +1,22 @@
+#! /bin/bash
+
+# Import the XML range message table from the authoritative source,
+# the International ISBN Agency.
+
+ISBN_INTERNATIONAL_HOME='https://www.isbn-international.org'
+TABLE_SFN='export_rangemessage.xml'
+TABLE_URL="${ISBN_INTERNATIONAL_HOME}/${TABLE_SFN}"
+
+wget_exe="$(command -v wget2)" || wget_exe="$(command -v wget)"
+
+"${wget_exe}" \
+    --output-document isbn-range-utf8.xml \
+    --append-output wget.log "${TABLE_URL}"
+
+if command -v charset-devolve > /dev/null 2>&1
+then
+    charset-devolve --charset=utf8 isbn-range-utf8.xml > isbn-range.xml
+else
+    mv isbn-range-utf8.xml isbn-range.xml
+fi
+

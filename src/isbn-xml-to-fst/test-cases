@@ -1,0 +1,179 @@
+#! /usr/bin/perl
+
+=pod
+
+=begin description
+
+## <<description>> ##
+
+=end description
+
+=cut
+
+require 5.0;
+use strict;
+use warnings;
+use Carp;
+use diagnostics;
+use Getopt::Long;
+use File::Spec::Functions;
+use Cwd qw(getcwd);             # Needed at least for explain_cwd()
+
+my $eprint_fh;
+my $dprint_fh;
+
+my $debug   = 0;
+my $verbose = 0;
+my $endl = "\n";
+
+my @options = (
+    'debug'   => \$debug,
+    'verbose' => \$verbose,
+);
+
+my $any_change = 0;
+
+#:subroutines:#
+
+# Decide how to direct eprint*() and dprint*() functions.
+# If STDOUT and STDERR are directed to the same "channel",
+# then eprint*() and dprint*() should be tied to the same file handle.
+#
+# Otherwise, buffering could cause a mix of STDOUT and STDERR to
+# be written out of order.
+#
+sub set_print_fh {
+    my @stdout_statv;
+    my @stderr_statv;
+    my $stdout_chan;
+    my $stderr_chan;
+
+    @stdout_statv = stat(*STDOUT);
+    @stderr_statv = stat(*STDERR);
+    $stdout_chan = join(':', @stdout_statv[0, 1, 6]);
+    $stderr_chan = join(':', @stderr_statv[0, 1, 6]);
+    if (!defined($eprint_fh)) {
+        $eprint_fh = ($stderr_chan eq $stdout_chan) ? *STDOUT : *STDERR;
+    }
+    if (!defined($dprint_fh)) {
+        $dprint_fh = ($stderr_chan eq $stdout_chan) ? *STDOUT : *STDERR;
+    }
+}
+
+# print/printf to stderr.  Mark as error message, using color or highlight.
+#
+sub eprint {
+    if (-t $eprint_fh) {
+        print {$eprint_fh} "\e[01;31m\e[K", @_, "\e[m\e[K";
+    }
+    else {
+        print {$eprint_fh} @_;
+    }
+}
+
+sub eprintf {
+    if (-t $eprint_fh) {
+        print  {$eprint_fh}  "\e[01;31m\e[K";
+        printf {$eprint_fh} @_;
+        print  {$eprint_fh}  "\e[m\e[K";
+    }
+    else {
+        printf {$eprint_fh} @_;
+    }
+}
+
+# print/printf to same fd as stderr, but information only.
+# Do not mark, or color or highlight in any way.
+#
+sub ieprint {
+    print  {$eprint_fh} @_;
+}
+
+sub ieprintf {
+    printf {$eprint_fh} @_;
+}
+
+sub vprint {
+    print @_ if ($verbose);
+}
+
+sub vprintf {
+    printf @_ if ($verbose);
+}
+
+# print/prinf to same fd as stderr, like ieprint/ieprintf, but only if --verbose
+#
+sub veprint {
+    print  {$eprint_fh} @_ if ($verbose);
+}
+
+sub veprintf {
+    printf {$eprint_fh} @_ if ($verbose);
+}
+
+# print/printf to dprint_fh only if --debug
+# dprint_fh may or may not be the same as eprint_fh,
+# which may or may not be stderr.
+#
+sub dprint {
+    print {$dprint_fh} @_ if ($debug);
+}
+
+sub dprintf {
+    printf {$dprint_fh} @_ if ($debug);
+}
+
+sub err_exit {
+    my ($xcode) = @_;
+
+    if ($any_change == 0) {
+        ieprint 'Nothing done.', $endl;
+    }
+    exit $xcode;
+}
+
+#:options:#
+
+set_print_fh();
+
+GetOptions(@options) or exit 2;
+
+#:main:#
+
+my $home = $ENV{'HOME'};
+my $project_dir = catfile($home, 'vproject', 'isbn');
+my $src_dir     = catfile($project_dir, 'ws', 'src');
+my $wrk_dir = catfile($src_dir, 'isbn-xml-to-fst');
+
+if (!chdir($wrk_dir)) {
+    eprint "chdir('${wrk_dir}') failed; $!", $endl;
+    exit 2;
+}
+
+system('rm', '-rf', 'tmp', 'core');
+if (!mkdir('tmp')) {
+    eprint "mkdir('tmp') failed; $!", $endl;
+    exit 2;
+}
+
+my @recv = ();
+for my $rec (<DATA>) {
+    chomp($rec);
+    my ($isbn, $expect, $registrant) = split(/;/, $rec);
+    printf '%-14s %18s %s', $isbn, $expect, $registrant;
+    print $endl;
+    push(@recv, $rec);
+}
+
+for my $rec (@recv) {
+    my ($isbn, $expect, $registrant) = split(/;/, $rec);
+    my @cmdv = ( './isbn-xml-to-fst', 'isbn-range.xml', $isbn );
+    system(join(' ', @cmdv) . " > tmp/${isbn}.out 2>tmp/${isbn}.err");
+}
+
+exit 0;
+__DATA__
+9780312128470;978-0-312-12847-0;English Language
+9788132220794;978-81-322-2079-4;India
+9780131103627;978-0-13-110362-7;English Language
+9781449373320;978-1-4493-7332-0;???
